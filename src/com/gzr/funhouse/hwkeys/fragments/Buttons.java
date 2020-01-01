@@ -22,6 +22,7 @@ import android.content.ContentResolver;
 import android.content.pm.PackageManager.NameNotFoundException;
 import android.content.res.Resources;
 import android.os.Bundle;
+import android.os.Handler;
 import android.os.UserHandle;
 import android.os.RemoteException;
 import android.os.ServiceManager;
@@ -61,6 +62,7 @@ public class Buttons extends ActionFragment implements OnPreferenceChangeListene
     private static final String CATEGORY_APPSWITCH = "app_switch_key";
     private static final String CATEGORY_VOLUME = "volume_keys";
     private static final String CATEGORY_POWER = "power_key";
+    private static final String DISABLE_NAV_KEYS = "disable_nav_keys";
     // Masks for checking presence of hardware keys.
     // Must match values in frameworks/base/core/res/res/values/config.xml
     public static final int KEY_MASK_HOME = 0x01;
@@ -70,6 +72,10 @@ public class Buttons extends ActionFragment implements OnPreferenceChangeListene
     public static final int KEY_MASK_APP_SWITCH = 0x10;
     public static final int KEY_MASK_CAMERA = 0x20;
     public static final int KEY_MASK_VOLUME = 0x40;
+
+    private SwitchPreference mDisableNavigationKeys;
+    private boolean mIsNavSwitchingMode = false;
+    private Handler mHandler;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -122,6 +128,20 @@ public class Buttons extends ActionFragment implements OnPreferenceChangeListene
         }
          // let super know we can load ActionPreferences
         onPreferenceScreenLoaded(ActionConstants.getDefaults(ActionConstants.HWKEYS));
+
+        // Force Navigation bar related options
+        mDisableNavigationKeys = (SwitchPreference) findPreference(DISABLE_NAV_KEYS);
+
+        // Only visible on devices that does not have a navigation bar already
+        if (ActionUtils.isHWKeysSupported(getActivity())) {
+            mDisableNavigationKeys.setOnPreferenceChangeListener(this);
+            mHandler = new Handler();
+            // Remove keys that can be provided by the navbar
+            updateDisableNavkeysOption();
+            setActionPreferencesEnabled(mDisableNavigationKeys.isChecked());
+        } else {
+            prefScreen.removePreference(mDisableNavigationKeys);
+        }
     }
 
     @Override
@@ -141,6 +161,35 @@ public class Buttons extends ActionFragment implements OnPreferenceChangeListene
 
     @Override
     public boolean onPreferenceChange(Preference preference, Object objValue) {
+        ContentResolver resolver = getActivity().getContentResolver();
+        if (preference == mDisableNavigationKeys) {
+            if (mIsNavSwitchingMode) {
+                return false;
+            }
+            mIsNavSwitchingMode = true;
+            mDisableNavigationKeys.setEnabled(false);
+            updateDisableNavkeysOption();
+            mDisableNavigationKeys.setEnabled(true);
+            mHandler.postDelayed(new Runnable() {
+                @Override
+                public void run() {
+                    mIsNavSwitchingMode = false;
+                }
+            }, 1000);
+            return true;
+        }
         return false;
     }
+
+    private void writeDisableNavkeysOption(boolean enabled) {
+        Settings.System.putIntForUser(getActivity().getContentResolver(),
+                Settings.System.FORCE_SHOW_NAVBAR, enabled ? 1 : 0, UserHandle.USER_CURRENT);
+    }
+
+    private void updateDisableNavkeysOption() {
+        boolean enabled = Settings.System.getIntForUser(getActivity().getContentResolver(),
+                Settings.System.FORCE_SHOW_NAVBAR, 0, UserHandle.USER_CURRENT) != 0;
+        mDisableNavigationKeys.setChecked(enabled);
+    }
+
 }

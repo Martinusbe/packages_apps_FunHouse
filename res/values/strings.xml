@@ -339,4 +339,8 @@
     <string name="custom_button_lights_summary">Activate to adopt screen brightness level</string>
     <string name="custom_button_brightness_title">Set brightness manually</string>
 
+    <!-- Buttons - Enable navbar -->
+    <string name="disable_navkeys_title">Enable navigation bar</string>
+    <string name="disable_navkeys_summary">Enable bottom navigation bar</string>
+
 </resources>
